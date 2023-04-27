@@ -89,7 +89,7 @@ async def train(
     continue_training : bool, optional
         xgboost model parameter for training continuation
     size : int, optional
-        size of processed dataset
+        size of processed dataset 
     
     Returns
     -------

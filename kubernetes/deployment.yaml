@@ -6,7 +6,6 @@ metadata:
   labels:
     app: loan-app
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: loan-app

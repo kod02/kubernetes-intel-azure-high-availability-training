@@ -12,4 +12,4 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: sgx-loan-app
-  targetCPUUtilizationPercentage: 50 # 50% of CPU utilization
+  targetCPUUtilizationPercentage: 50
