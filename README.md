@@ -7,7 +7,7 @@
 © Copyright 2023, Intel Corporation
 ## Microsoft Azure
 
-The Intel® Cloud Optimization Module for Kubernetes* can be used to build and deploy highly available and scalable AI applications on Microsoft Azure. The machine learning component of the module focuses on predicting the probability of a loan default using Intel® optimizations in XGBoost and Intel® oneDAL to accelerate model training and inference. We also demonstrate how to use incremental training of the XGBoost model as new data becomes available.
+The Intel® Cloud Optimization Module for Kubernetes* can be used to build and deploy highly available and scalable AI applications on Microsoft Azure. The machine learning component of the module focuses on predicting the probability of a loan default using [Intel® optimizations for XGBoost](https://www.intel.com/content/www/us/en/developer/tools/oneapi/optimization-for-xgboost.html) and [Intel® oneDAL](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onedal.html) to accelerate model training and inference. We also demonstrate how to use incremental training of the XGBoost model as new data becomes available.
 
 The solution architecture uses Docker for application containerization and stores the image in an Azure Container Registry (ACR). The application is then deployed on a cluster managed by Azure Kubernetes Service (AKS). Our cluster runs on confidential computing virtual machines leveraging [Intel® Software Guard Extensions (Intel® SGX)](https://www.intel.com/content/www/us/en/developer/tools/software-guard-extensions/overview.html). We use a mounted Azure File Share for persistent data and model storage. An Azure Load Balancer is provisioned by our Kubernetes service that the client uses to interact with our application.
 
@@ -24,7 +24,7 @@ The solution architecture uses Docker for application containerization and store
 ## Solution Architecture
 
 <p align="center">
-  <img src="assets/architecture.png" alt="Solution Architecture"/>
+  <img src="assets/architecture.svg" alt="Solution Architecture"/>
 </p>
 
 ## Loan Default Risk Prediction Application
@@ -65,12 +65,12 @@ The directory tree below outlines the codebase's various scripts, assets, and co
 [Back to Table of Contents](#table-of-contents)
 ## Prerequisites
 
-This module assumes you have a [Microsoft Azure](https://azure.microsoft.com/en-ca) account. While Azure is used for the infrastructure set up, the lessons learned in this module can be applied to other cloud platforms. If you are using Amazon Web Services (AWS), you may want to check out [this repository](https://github.com/intel/kubernetes-intel-aws-high-availability-training) instead.
+This module assumes you have a [Microsoft Azure](https://azure.microsoft.com/en-ca) account. While Azure is used for the infrastructure set up, the lessons learned in this module can be applied to other cloud platforms. You can also implement this module on Amazon Web Services (AWS) by following the steps in [this repository](https://github.com/intel/kubernetes-intel-aws-high-availability-training).
 
-### Microsoft Azure CLI 2.0
-If you haven't already, install the Microsoft Azure CLI 2.0 following the official documentation for your operating system [here](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli). Ensure that you are using version 2.46.0 or above.
-
-To find your installation version, run `az version`.
+### Installations:
+- Download and install the [Microsoft Azure CLI](https://learn.microsoft.com/en-us/cli/azure/). 
+  - Ensure that you are using version 2.46.0 or above. To find your installation version, run `az version`.
+- Download and install the Kubernetes command-line tool, [kubectl](https://kubernetes.io/docs/tasks/tools/).
 
 ## Setting up Azure Resources
 ### I. Sign in with the Azure CLI
@@ -180,7 +180,7 @@ Your output should be similar to:
 >Your cluster can pull images from loandefaultapp.azurecr.io!
 
 
-Once the system node pool has been deployed, we'll add the Intel SGX VM node pool to the cluster using an instance of the [DCSv3 series](https://learn.microsoft.com/en-us/azure/virtual-machines/dcv3-series). The name of the confidential node pool is `intelsgx`, which will be referenced in the Kuburnetes deployment manifest for scheduling our application pods. We'll enable cluster autoscaling on this node pool and set a minimum of 1 node and a maximum of 5 nodes.
+Once the system node pool has been deployed, we'll add the Intel SGX VM node pool to the cluster using an instance of the [DCSv3 series](https://learn.microsoft.com/en-us/azure/virtual-machines/dcv3-series). The name of the confidential node pool is `intelsgx`, which will be referenced in the Kuburnetes deployment manifest for scheduling our application pods. We'll enable cluster autoscaling for this node pool and set a minimum of 1 node and a maximum of 5 nodes.
 
 ```
 az aks nodepool add --resource-group $RG \
@@ -210,6 +210,7 @@ NAME                                STATUS   ROLES   AGE     VERSION
 aks-intelsgx-10192822-vmss000002    Ready    agent   2m10s   v1.25.5
 ```
 
+To check that the [SGX device plugin](https://github.com/intel/intel-device-plugins-for-kubernetes#sgx-device-plugin) has been created properly, run the following command:
 ```
 kubectl get pods -A
 ```
@@ -309,7 +310,7 @@ loan-app-load-balancer   LoadBalancer   10.0.83.32   20.xxx.xxx.xxx   8080:30242
 
 ### V. Create a Kubernetes Deployment
 Now we're ready to deploy the first pod for our application. We will initially set up one pod and use the [Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/) to scale up and scale down additional pods as needed. To create and manage our application pods, we will use a [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). A Kubernetes Deployment is a Kubernetes resource that allows you to declaratively manage a set of replica pods for a given application, ensuring that the desired number of pods are running and available at all times. In the pod template of the deployment spec, we will specify that our pods only be scheduled on a node in the Intel SGX node pool. If an SGX node is not available, the cluster will automatically scale up to add an additional SGX node. We will also specify the directory in our pod where the volume will be mounted to, which will be in the `loan_app/azure-file` directory. When the pod is scheduled, the cluster will inspect the persistent volume claim to find the bound volume and mount the Azure file share to our pod.
-> Note: Before executing the command below, you will need to update the container image field in the `deployment.yaml` file with the name of the Azure Container Registry, repository, and tag, e.g., `loandefaultapp.azurecr.io/loan-default-app:latest`.
+> **Note**: Before executing the command below, you will need to update the container image field in the `deployment.yaml` file with the name of the Azure Container Registry, repository, and tag, e.g., `loandefaultapp.azurecr.io/loan-default-app:latest`.
 ```
 kubectl create -f kubernetes/deployment.yaml -n $NS
 ```
@@ -333,7 +334,7 @@ deployment.apps/sgx-loan-app   1/1     1            1           81s
 NAME                                      DESIRED   CURRENT   READY   AGE
 replicaset.apps/sgx-loan-app-5948f49746   1         1         1       81s
 ```
-> Note: You can use `kubectl logs <pod-name> -n $NS --follow` to stream the logs from the pod.
+> **Note**: You can use `kubectl logs <pod-name> -n $NS --follow` to stream the logs from the pod.
 
 ### VI. Create a Kubernetes Horizontal Pod Autoscaler
 
@@ -352,7 +353,7 @@ Your output should be similar to:
 NAME                      REFERENCE                 TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
 loan-app-pod-autoscaler   Deployment/sgx-loan-app   0%/50%    1         5         1          40s
 ```
-> Note: You can use `kubectl get hpa -n $NS --watch` to view HPA updates.
+> **Note**: You can use `kubectl get hpa -n $NS --watch` to view HPA updates.
 
 [Back to Table of Contents](#table-of-contents)
 ## Deploying the Application
@@ -366,7 +367,7 @@ The Data Processing endpoint receives the original credit risk CSV file, creates
 - <b>`data_directory`</b>: The directory in the file share where processed data should be stored.   
 - <b>`file`</b>: The original credit risk CSV file located in the working directory.   
 - <b>`size`</b>: The desired size of final dataset, default 4M rows.   
-> Note: The data used in this module can be downloaded from Kaggle [here](https://www.kaggle.com/datasets/laotse/credit-risk-dataset).
+> **Note**: The data used in this module can be downloaded from Kaggle [here](https://www.kaggle.com/datasets/laotse/credit-risk-dataset).
 
 You can make a call to the Data Processing endpoint using the command below with the external IP address that was created by the Azure load balancer.
 ```
@@ -484,6 +485,7 @@ Your output should be similar to:
 ```
 
 In the `loan-app-file-share`, you should see a new directory named samples with the Daal4py prediction results saved in a CSV file.  
+
 [Back to Table of Contents](#table-of-contents)
 
 ## Cleaning up Resources
